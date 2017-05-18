@@ -3,10 +3,11 @@ package com.xyp.meyki_bear.recyclerviewdemo.adapter;
 import android.content.Context;
 import android.support.annotation.IdRes;
 import android.support.annotation.LayoutRes;
+import android.support.annotation.Nullable;
+import android.support.v7.util.DiffUtil;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
-import android.util.Log;
 import android.util.SparseArray;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -43,11 +44,20 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
     private int footerCount; //承接变量
     private onItemClickListener onItemClickListener;
     private onItemLongClickListener onItemLongClickListener;
+    protected OnItemViewClickListener onItemViewClickListener;
 
-
-    public List<T> getData(){
-        return data;
+    public interface onItemClickListener {
+        void onItemClick(int position);
     }
+
+    public interface onItemLongClickListener {
+        boolean onItemLongClick(int position);
+    }
+
+    public interface OnItemViewClickListener {
+        void onItemViewClick(View view, int position);
+    }
+
     public void setOnItemLongClickListener(MyBaseRecyclerAdapter.onItemLongClickListener onItemLongClickListener) {
         this.onItemLongClickListener = onItemLongClickListener;
     }
@@ -56,19 +66,10 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         this.onItemClickListener = onItemClickListener;
     }
 
-    public void clearHeaderView(){
-        if(mHeaderViews==null){
-            return ;
-        }
-        mHeaderViews.clear();
+    public void setOnItemViewClickListener(OnItemViewClickListener onItemViewClickListener) {
+        this.onItemViewClickListener = onItemViewClickListener;
     }
 
-    public void clearFooterView(){
-        if(mFooterViews==null){
-            return;
-        }
-        mFooterViews.clear();
-    }
     /**
      * 设置没数据时的emptyView
      *
@@ -113,6 +114,7 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         }
     }
 
+
     private void setHeardViewsShowWhat(boolean isShow) {
         if (mHeaderViews != null) {
             mHeaderViews.setShow(isShow);
@@ -154,28 +156,91 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         inflater = LayoutInflater.from(context);
     }
 
-    public void addHeaderView(View headerView) {
+    public InnerBaseViewHolder addHeaderView(View headerView) {
+        return addHeaderView(headerView, -1);
+    }
+
+    /**
+     * 在置顶位置插入一个headerView
+     *
+     * @param headerView
+     * @param index      这个index不能超过插入前headerViews的长度
+     */
+    public InnerBaseViewHolder addHeaderView(View headerView, int index) {
         if (mHeaderViews == null) {
             mHeaderViews = new HeaderAndFooterList();
         }
-        HeaderAndFooterBean map = new HeaderAndFooterBean();
-        map.itemType = headerType;
-        map.view = headerView;
-        mHeaderViews.add(map);
-        notifyItemInserted(mHeaderViews.size() - 1);
-        headerType++;
-    }
-
-    public void addFooterView(View footerView) {
-        if (mFooterViews == null) {
-            mFooterViews = new HeaderAndFooterList();
+        //同一个headerView不能重复添加
+        for (int i = 0; i < mHeaderViews.size(); i++) {
+            if (mHeaderViews.get(i).view.itemView == headerView) {
+                return mHeaderViews.get(i).view;
+            }
         }
         HeaderAndFooterBean map = new HeaderAndFooterBean();
-        map.itemType = footerType;
-        map.view = footerView;
-        mFooterViews.add(map);
-        int footerSize = 0;
+        map.itemType = headerType;
+        map.view = new InnerBaseViewHolder(headerView,null,true);
+        if (index == -1) {
+            mHeaderViews.add(map);
+            notifyItemInserted(mHeaderViews.size() - 1);
+        } else {
+            mHeaderViews.add(index, map);
+            notifyItemInserted(index);
+        }
+        headerType++;
+        return map.view;
+    }
+
+    public void removeHeaderView(View headerView) {
+        if (mHeaderViews == null) {
+            return;
+        }
+        for (int i = mHeaderViews.size() - 1; i >= 0; i--) {
+            if (mHeaderViews.get(i).view.itemView == headerView) {
+                mHeaderViews.remove(i);
+                notifyItemRemoved(i);
+            }
+        }
+    }
+
+    public void clearHeaderView() {
+        if (mHeaderViews == null) {
+            return;
+        }
+        notifyItemRangeRemoved(0, mHeaderViews.size() - 1);
+        mHeaderViews.clear();
+    }
+
+    public int findHeaderPosition(View view) {
+        for (int i = 0; i < mHeaderViews.size(); i++) {
+            if (mHeaderViews.get(i).view.itemView == view) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public void clearFooterView() {
+        if (mFooterViews == null) {
+            return;
+        }
+        mFooterViews.clear();
+    }
+
+    public void removeFooterView(View footerView) {
+        if (mFooterViews == null) {
+            return;
+        }
+        for (int i = mFooterViews.size() - 1; i >= 0; i--) {
+            if (mFooterViews.get(i).view.itemView == footerView) {
+                mFooterViews.remove(i);
+            }
+        }
+        int headerSize = 0;
         int dataSize = 0;
+        int footerSize = 0;
+        if (mHeaderViews != null) {
+            headerSize = mHeaderViews.size();
+        }
         if (mFooterViews != null) {
             footerSize = mFooterViews.size();
         }
@@ -184,14 +249,47 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         }
         footerType++;
         //size从1开始，position从0开始，所以需要减1
-        notifyItemInserted((footerSize + dataSize + mFooterViews.size()) - 1);
+        notifyItemRemoved((headerSize + footerSize + dataSize + mFooterViews.size()) - 1);
+    }
+
+    public InnerBaseViewHolder addFooterView(View footerView) {
+        if (mFooterViews == null) {
+            mFooterViews = new HeaderAndFooterList();
+        }
+        //如果已经添加过了，则不在添加
+        for (int i = 0; i < mFooterViews.size(); i++) {
+            View view = mFooterViews.get(i).view.itemView;
+            if (view == footerView) {
+                return mFooterViews.get(i).view;
+            }
+        }
+        HeaderAndFooterBean map = new HeaderAndFooterBean();
+        map.itemType = footerType;
+        map.view = new InnerBaseViewHolder(footerView,null,true);
+        mFooterViews.add(map);
+        int headerSize = 0;
+        int dataSize = 0;
+        int footerSize = 0;
+        if (mHeaderViews != null) {
+            headerSize = mHeaderViews.size();
+        }
+        if (mFooterViews != null) {
+            footerSize = mFooterViews.size();
+        }
+        if (data != null) {
+            dataSize = data.size();
+        }
+        footerType++;
+        //size从1开始，position从0开始，所以需要减1
+        notifyItemInserted((headerSize + footerSize + dataSize + mFooterViews.size()) - 1);
+        return map.view;
     }
 
 
     public void setItemTypeLayout(HashMap<Integer, Integer> itemTypeLayout) {
         layoutIds = itemTypeLayout;
     }
-    private int i=0;
+
     @Override
     public InnerBaseViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         if (viewType == EMPTY_TYPE) { //如果是空
@@ -203,7 +301,8 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         if (mHeaderViews != null && mHeaderViews.getShow()) {
             for (int i = 0; i < mHeaderViews.size(); i++) {
                 if (mHeaderViews.get(i).itemType == viewType) {
-                    InnerBaseViewHolder viewHolder = new InnerBaseViewHolder(mHeaderViews.get(headerCount).view, mContext);
+                    InnerBaseViewHolder viewHolder = mHeaderViews.get(headerCount).view;
+                    viewHolder.setmContext(mContext);
                     return viewHolder;
                 }
             }
@@ -211,42 +310,58 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         if (mFooterViews != null && mFooterViews.getShow()) {
             for (int i = 0; i < mFooterViews.size(); i++) {
                 if (mFooterViews.get(i).itemType == viewType) {
-                    InnerBaseViewHolder viewHolder = new InnerBaseViewHolder(mFooterViews.get(footerCount).view, mContext);
+                    InnerBaseViewHolder viewHolder = mFooterViews.get(footerCount).view;
+                    viewHolder.setmContext(mContext);
                     return viewHolder;
                 }
             }
         }
+
         if (layoutIds != null) {
-        layoutId = layoutIds.get(viewType);
+            layoutId = layoutIds.get(viewType);
         }
         View view = inflater.inflate(layoutId, parent, false);
         InnerBaseViewHolder viewHolder = new InnerBaseViewHolder(view, mContext);
-        onInitViewHolder(viewHolder, viewType);
-        onInitViewHolder(parent,viewHolder,viewType);
+        onInitViewHolder(viewHolder,parent,viewType);
         return viewHolder;
     }
 
+    protected void onInitViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder,ViewGroup parent, int viewType){
+        onInitViewHolder(holder,viewType);
+    }
     /**
      * 初始化控件布局，有需要的话可以重写
      *
      * @param holder
      * @param viewType
      */
-    protected void onInitViewHolder(InnerBaseViewHolder holder, int viewType) {
+    protected void onInitViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder, int viewType) {
 
     }
 
-    protected void onInitViewHolder(ViewGroup parent,InnerBaseViewHolder holder, int viewType){
-
-    }
-
+    /**
+     * 与onCreateViewHolder对应的方法
+     *
+     * @param holder
+     * @param position
+     * @param payloads
+     */
     @Override
-    public void onBindViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder, int position) {
+    public void onBindViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder, int position, List<Object> payloads) {
         if (isHeaderView(position) || isFooterView(position) || isEmpty) {
             return;
         }
         final int pos = getRealPosition(holder);
-        convert(holder, data.get(pos), pos, getType(pos));
+        if (payloads.isEmpty()) { //区分是否是增量更新 ，不是
+            onBindViewHolder(holder, pos);
+        } else {  //是
+            convert(holder, data.get(pos), pos, getType(pos), payloads);
+        }
+    }
+
+    @Override
+    public void onBindViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder, int position) {
+        convert(holder, data.get(position), position, getType(position));
     }
 
 
@@ -323,7 +438,7 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
     public abstract int getType(int position);
 
     /**
-     * 处理数据，
+     * 处理数据
      *
      * @param holder   要显示数据的item
      * @param t        要显示的数据
@@ -331,6 +446,19 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
      * @param position 当前item的position，已经进行预处理，去掉了头尾布局的影响
      */
     public abstract void convert(InnerBaseViewHolder holder, T t, int position, int itemType);
+
+    /**
+     * 适用于增量更新的convert，需要使用增量更新可以重写使用
+     *
+     * @param holder
+     * @param t
+     * @param position
+     * @param itemType
+     * @param payloads
+     */
+    public void convert(InnerBaseViewHolder holder, T t, int position, int itemType, List<Object> payloads) {
+        convert(holder, t, position, itemType);
+    }
 
     private boolean isEmpty;//数据是否为空
 
@@ -400,14 +528,6 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         super.onAttachedToRecyclerView(recyclerView);
     }
 
-    public interface onItemClickListener {
-        void onItemClick(int position);
-    }
-
-    public interface onItemLongClickListener {
-        boolean onItemLongClick(int position);
-    }
-
     public class InnerBaseViewHolder extends RecyclerView.ViewHolder {
         private SparseArray<View> views;
         private Context mContext;
@@ -421,10 +541,24 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
             this.tag = tag;
         }
 
+        public InnerBaseViewHolder(View itemView) {
+            super(itemView);
+        }
+
+        public void setmContext(Context mContext) {
+            this.mContext = mContext;
+        }
+
         public InnerBaseViewHolder(View itemView, Context context) {
+            this(itemView,context,false);
+        }
+        public InnerBaseViewHolder(View itemView, Context context,boolean isHeaderOrFooter){
             super(itemView);
             mContext = context;
             views = new SparseArray<>();
+            if (isEmpty||isHeaderOrFooter) { //空布局,头尾布局不设置任何监听
+                return;
+            }
             if (onItemClickListener != null) {
                 itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -443,7 +577,6 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
                 });
             }
         }
-
         public <Z extends View> Z getView(@IdRes int resId) {
             View view = views.get(resId);
             if (view == null) {
@@ -456,7 +589,7 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
 
     class HeaderAndFooterBean {
         int itemType;
-        View view;
+        InnerBaseViewHolder view;
     }
 
     class HeaderAndFooterList extends ArrayList<HeaderAndFooterBean> {
@@ -505,16 +638,100 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
     }
 
     public int getmHeadSize() {
-        if(mHeaderViews==null){
-            return 0;
-        }
-        return mHeaderViews.size();
+        return mHeaderViews == null ? 0 : mHeaderViews.size();
     }
 
     public int getmFootSize() {
-        if(mFooterViews==null){
-            return 0;
+        return mFooterViews == null ? 0 : mFooterViews.size();
+    }
+
+    /**
+     * 预处理了头尾布局
+     */
+    public abstract class BaseDiffUtilCallback extends DiffUtil.Callback {
+        private List<T> mOldList;
+        private List<T> mNewList;
+
+        public BaseDiffUtilCallback(List<T> oldList, List<T> newList) {
+            this.mOldList = oldList;
+            this.mNewList = newList;
         }
-        return mFooterViews.size();
+
+        public List<T> getOldList() {
+            return mOldList;
+        }
+
+        public List<T> getNewList() {
+            return mNewList;
+        }
+
+        @Override
+        public int getOldListSize() {
+            return mOldList != null ? getmHeadSize() + mOldList.size() : 0;
+        }
+
+        @Override
+        public int getNewListSize() {
+            return mNewList != null ? getmHeadSize() + mNewList.size() : 0;
+        }
+
+        /**
+         * 去掉头布局对position的影响
+         *
+         * @param oldItemPosition
+         * @param newItemPosition
+         * @return
+         */
+        @Override
+        public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+            if (isHeaderView(oldItemPosition) && isHeaderView(newItemPosition)) { //diffUtil不进行头尾布局的刷新操作
+                return true;
+            }
+            if (isHeaderView(oldItemPosition) != isHeaderView(newItemPosition)) { //如果同样的item一个是头尾布局一个不是，则默认返回false
+                return false;
+            }
+            if (isFooterView(oldItemPosition) != isFooterView(newItemPosition)) { //如果同样的item一个是头尾布局一个不是，则默认返回false
+                return false;
+            }
+            if(oldItemPosition>getOldList().size()-1||newItemPosition>getNewList().size()-1){
+                return false;
+            }
+            return areItemSame(getRealPosition(oldItemPosition), getRealPosition(newItemPosition));
+        }
+
+        public abstract boolean areItemSame(int oldItemPosition, int newItemPosition);
+
+        /**
+         * 去掉头布局对position的影响
+         *
+         * @param oldItemPosition
+         * @param newItemPosition
+         * @return
+         */
+        @Override
+        public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+            if (isHeaderView(oldItemPosition) && isHeaderView(newItemPosition)) { //diffUtil不进行头尾布局的刷新操作
+                return true;
+            }
+            return areContentSame(getRealPosition(oldItemPosition), getRealPosition(newItemPosition));
+        }
+
+        public abstract boolean areContentSame(int oldItemPosition, int newItemPosition);
+
+        /**
+         * 取出了头布局对集合数据的影响
+         *
+         * @param oldItemPosition
+         * @param newItemPosition
+         * @return
+         */
+        @Nullable
+        @Override
+        public Object getChangePayload(int oldItemPosition, int newItemPosition) {
+            return getChangeLoad(getRealPosition(oldItemPosition), getRealPosition(newItemPosition));
+        }
+
+        @Nullable
+        public abstract Object getChangeLoad(int oldItemPosition, int newItemPosition);
     }
 }
