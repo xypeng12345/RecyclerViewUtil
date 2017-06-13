@@ -21,14 +21,37 @@ import java.util.List;
 
 public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.HeaderAndFooterViewHolder>
         extends RecyclerView.Adapter<MyHeaderFooterAdapter.HeaderAndFooterViewHolder> {
-
     private HeaderAndFooterList mHeaderViews;
     private HeaderAndFooterList mFooterViews;
     private int headerType = 20000;
     private int footerType = 30000;
 
+    private final static int EMPTY_TYPE = 40000; //数据为空时返回这个集合
+    private EmptyView emptyView;
+    private ShowWhat showWhat = ShowWhat.SHOW_ALL;//默认显示全部
+
     public void addHeaderView(View headerView) {
         addHeaderView(headerView, -1);
+    }
+
+    protected EmptyView getEmptyView() {
+        return emptyView;
+    }
+
+    public void setEmptyView(View emptyView, ShowWhat emptyShowWhat) {
+        if (this.emptyView == null) {
+            this.emptyView = new EmptyView();
+        }
+        this.emptyView.setEmpty(emptyView);
+        this.emptyView.setShowWhat(emptyShowWhat);
+
+    }
+
+    /**
+     * 清楚空数据布局
+     */
+    public void clearEmptyView() {
+        this.emptyView = null;
     }
 
     /**
@@ -113,7 +136,7 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
         if (mFooterViews != null) {
             footerSize = mFooterViews.size();
         }
-        dataSize = getDataCount();
+        dataSize = getCount();
         footerType++;
         //size从1开始，position从0开始，所以需要减1
         notifyItemInserted((headerSize + footerSize + dataSize + mFooterViews.size()) - 1);
@@ -138,7 +161,7 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
         if (mFooterViews != null) {
             footerSize = mFooterViews.size();
         }
-        dataSize = getDataCount();
+        dataSize = getCount();
         footerType++;
         //size从1开始，position从0开始，所以需要减1
         notifyItemRemoved((headerSize + footerSize + dataSize + mFooterViews.size()) - 1);
@@ -153,7 +176,45 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
 
     @Override
     public int getItemCount() {
-        return getHeaderCount() + getDataCount() + getFooterCount();
+        if (isEmpty()) {//数据为空，显示空布局,且根据空布局的设置
+            changeFooterAndHeaderShow(emptyView.getShowWhat());
+        } else {
+            changeFooterAndHeaderShow(showWhat);//数据不为空
+        }
+        return getHeaderCount() + getCount() + getFooterCount();
+    }
+
+    private void changeFooterAndHeaderShow(ShowWhat mEmptyShowWhat) {
+        switch (mEmptyShowWhat) {
+            case SHOW_ALL:
+                setHeardViewsShowWhat(true);
+                setFooterViewsShowWhat(true);
+                break;
+            case SHOW_HEADER:
+                setHeardViewsShowWhat(true);
+                setFooterViewsShowWhat(false);
+                break;
+            case SHOW_FOOTER:
+                setHeardViewsShowWhat(false);
+                setFooterViewsShowWhat(true);
+                break;
+            case SHOW_NONE:
+                setHeardViewsShowWhat(false);
+                setFooterViewsShowWhat(false);
+                break;
+        }
+    }
+
+    private void setHeardViewsShowWhat(boolean isShow) {
+        if (mHeaderViews != null) {
+            mHeaderViews.setShow(isShow);
+        }
+    }
+
+    private void setFooterViewsShowWhat(boolean isShow) {
+        if (mFooterViews != null) {
+            mFooterViews.setShow(isShow);
+        }
     }
 
     private int getHeaderCount() {
@@ -176,11 +237,18 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
         }
         //有尾布局且当前显示的position在尾布局的范围内
         if (isFooterView(position)) {
-            position = position - getHeaderCount() - getDataCount();
+            position = position - getHeaderCount() - getCount();
             return mFooterViews.get(position).itemType;
+        }
+        if (isEmpty()) { //不是头不是尾且是空数据，则返回空布局
+            return EMPTY_TYPE;
         }
         int pos = getRealPosition(position);
         return getType(pos);
+    }
+
+    private boolean isEmpty() {
+        return emptyView != null && getDataCount() == 0;
     }
 
     /**
@@ -190,7 +258,7 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
      * @return
      */
     final protected int getRealPosition(int position) {
-        if (mHeaderViews != null && position < getDataCount() + getHeaderCount()) {
+        if (mHeaderViews != null && position < getCount() + getHeaderCount()) {
             position = position - (mHeaderViews.size());
         }
         return position;
@@ -201,12 +269,25 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
     }
 
     private boolean isFooterView(int position) {
-        return mFooterViews != null && mFooterViews.getShow() && position > getDataCount() + getHeaderCount() - 1;
+        return mFooterViews != null && mFooterViews.getShow() && position > getCount() + getHeaderCount() - 1;
+    }
+
+    /**
+     * 如果数据为空且有空布局，则返回1，否则返回0
+     *
+     * @return
+     */
+    private int getCount() {
+        if (isEmpty()) {
+            return 1;
+        } else {
+            return getDataCount();
+        }
     }
 
     @Override
     final public void onBindViewHolder(MyHeaderFooterAdapter.HeaderAndFooterViewHolder holder, int position, List<Object> payloads) {
-        if (isHeaderView(position) || isFooterView(position)) {
+        if (isHeaderView(position) || isFooterView(position) || isEmpty()) {
             return;
         }
         final int pos = getRealPosition(position);
@@ -218,6 +299,9 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
 
     }
 
+    protected int getHeaderSize(){
+        return mHeaderViews==null?0:mHeaderViews.size();
+    }
 
     /**
      * 专门处理瀑布流的RecyclerView的头布局
@@ -262,7 +346,7 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
      * @return
      */
     final protected int getSpanSize(int position, int spanCount) {
-        return isHeaderView(position) || isFooterView(position) ?
+        return isHeaderView(position) || isFooterView(position) || isEmpty() ?
                 spanCount :
                 getViewHolderSpanSize(getRealPosition(position), spanCount);
     }
@@ -302,6 +386,7 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
             for (int i = 0; i < mHeaderViews.size(); i++) {
                 if (mHeaderViews.get(i).itemType == viewType) {
                     HeaderAndFooterViewHolder viewHolder = new HeaderAndFooterViewHolder(mHeaderViews.get(i).view);
+                    onInitHeaderViewHolder(parent, viewHolder);
                     return viewHolder;
                 }
             }
@@ -310,15 +395,58 @@ public abstract class MyHeaderFooterAdapter<VH extends MyHeaderFooterAdapter.Hea
             for (int i = 0; i < mFooterViews.size(); i++) {
                 if (mFooterViews.get(i).itemType == viewType) {
                     HeaderAndFooterViewHolder viewHolder = new HeaderAndFooterViewHolder(mFooterViews.get(i).view);
+                    onInitFooterViewHolder(parent, viewHolder);
                     return viewHolder;
                 }
             }
         }
+        if (isEmpty()) {
+            HeaderAndFooterViewHolder viewHolder = new HeaderAndFooterViewHolder(emptyView.getEmpty());
+            onInitEmpterViewHolder(parent, viewHolder);
+            return viewHolder;
+        }
         return onCreateDataViewHolder(parent, viewType);
+    }
+
+    protected void onInitHeaderViewHolder(ViewGroup parent, RecyclerView.ViewHolder header) {
+
+    }
+
+    protected void onInitFooterViewHolder(ViewGroup parent, RecyclerView.ViewHolder footer) {
+
+    }
+
+    protected void onInitEmpterViewHolder(ViewGroup parent, RecyclerView.ViewHolder empty) {
+
     }
 
     protected abstract VH onCreateDataViewHolder(ViewGroup parent, int viewType);
 
+
+    private class EmptyView {
+        private View empty;
+        private ShowWhat showWhat;
+
+        public View getEmpty() {
+            return empty;
+        }
+
+        public void setEmpty(View empty) {
+            this.empty = empty;
+        }
+
+        public ShowWhat getShowWhat() {
+            return showWhat;
+        }
+
+        public void setShowWhat(ShowWhat showWhat) {
+            this.showWhat = showWhat;
+        }
+    }
+
+    public enum ShowWhat {
+        SHOW_ALL, SHOW_HEADER, SHOW_FOOTER, SHOW_NONE
+    }
 
     private class HeaderAndFooterBean {
         int itemType;

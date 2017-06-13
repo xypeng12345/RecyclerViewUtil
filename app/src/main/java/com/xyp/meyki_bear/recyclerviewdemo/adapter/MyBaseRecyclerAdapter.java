@@ -81,6 +81,10 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
         mEmptyView.setShowWhat(showWhat);
     }
 
+    public List<T> getData() {
+        return data;
+    }
+
     /**
      * 设置是否显示头尾布局，注意这个showWhat对emptyView显示时的showWhat互相独立，仅仅设置的是有数据时头尾布局的显示方式
      * 如果要设置emptyView的头尾布局显示方式，请调用setEmptyView方法
@@ -469,7 +473,7 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
      */
     @Override
     public int getItemCount() {
-        int size = data.size();
+        int size = getRealCount();
         if (data.size() == 0 && mEmptyView.getEmpty() != null) { //数据为空且设置了空布局
             //如果数据为0，则显示空布局emptyView
             size = 1;
@@ -489,6 +493,10 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
             size = size + mFooterViews.size();
         }
         return size;
+    }
+
+    protected int getRealCount(){
+        return data.size();
     }
 
     /**
@@ -634,7 +642,7 @@ public abstract class MyBaseRecyclerAdapter<T> extends RecyclerView.Adapter<MyBa
     }
 
     public enum EmptyShowWhat {
-        SHOW_ALL, SHOW_HEADER, SHOW_FOOTER, SHOW_NONE;
+        SHOW_ALL, SHOW_HEADER, SHOW_FOOTER, SHOW_NONE
     }
 
     public int getmHeadSize() {
