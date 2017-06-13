@@ -3,15 +3,10 @@ package com.xyp.meyki_bear.recyclerviewdemo.wheel.wheel;
 import android.content.Context;
 import android.support.annotation.LayoutRes;
 import android.view.ViewGroup;
-import android.widget.TextView;
 
-import com.xyp.meyki_bear.recyclerviewdemo.R;
 import com.xyp.meyki_bear.recyclerviewdemo.adapter.MyBaseRecyclerAdapter;
 
-import java.util.HashMap;
 import java.util.List;
-
-import static android.icu.lang.UCharacter.GraphemeClusterBreak.T;
 
 /**
  * 项目名称：RecyclerViewDemo
@@ -34,7 +29,7 @@ public abstract class WheelAdapter<T> extends MyBaseRecyclerAdapter<T>{
 
 
     @Override
-    protected void onInitViewHolder(ViewGroup parent, InnerBaseViewHolder holder, int viewType) {
+    protected void onInitViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder,ViewGroup parent,  int viewType) {
         //对父布局的尺寸进行测量
         int measuredHeight = parent.getLayoutParams().height;
         ViewGroup.LayoutParams la = holder.itemView.getLayoutParams();

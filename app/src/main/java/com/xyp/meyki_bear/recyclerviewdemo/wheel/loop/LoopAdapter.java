@@ -1,8 +1,6 @@
 package com.xyp.meyki_bear.recyclerviewdemo.wheel.loop;
 
 import android.content.Context;
-import android.support.annotation.LayoutRes;
-import android.util.Log;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
@@ -40,8 +38,8 @@ public class LoopAdapter extends WheelAdapter<String> {
     }
 
     @Override
-    protected void onInitViewHolder(ViewGroup parent, InnerBaseViewHolder holder, int viewType) {
-        super.onInitViewHolder(parent, holder, viewType);
+    protected void onInitViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder, ViewGroup parent, int viewType) {
+        super.onInitViewHolder(holder,parent,viewType);
     }
 
     @Override

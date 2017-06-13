@@ -3,6 +3,7 @@ package com.xyp.meyki_bear.recyclerviewdemo.wheel.wheel;
 import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.LinearSnapHelper;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
@@ -22,7 +23,7 @@ import com.xyp.meyki_bear.recyclerviewdemo.R;
  */
 
 public abstract class WheelView {
-    private static final String TAG="WheelView" ;
+    private static final String TAG = "WheelView";
     /**
      * 用于绘制遮挡区的工具
      */
@@ -59,6 +60,7 @@ public abstract class WheelView {
         return rv;
     }
 
+    private LinearSnapHelper snapHelper;
     /**
      * 控件滑动时的监听
      */
@@ -93,11 +95,17 @@ public abstract class WheelView {
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         adapter = (WheelAdapter) rv.getAdapter();
         adapter.setRawCount(rawCount);
-        if(decoration!=null){
+        if (decoration != null) {
             rv.addItemDecoration(decoration);
         }
         rv.setLayoutManager(layoutManager);
         rv.addOnScrollListener(listener);
+        rv.setOnFlingListener(new RecyclerView.OnFlingListener() {
+            @Override
+            public boolean onFling(int velocityX, int velocityY) {
+                return false;
+            }
+        });
     }
 
     public void setDecoration(ChooseDecoration decoration) {
@@ -105,6 +113,7 @@ public abstract class WheelView {
         rv.addItemDecoration(decoration);
     }
 
+    private boolean mScrolled;
     //recyclerView滑动时的监听
     private RecyclerView.OnScrollListener listener = new RecyclerView.OnScrollListener() {
         @Override
@@ -126,13 +135,34 @@ public abstract class WheelView {
                         chooseItem(childAdapterPosition);
                         return;
                     }
-                    int i = top + measuredHeight;
-                    if (i < 0) { //item的一半高度都超出超出了上限,那就滑到下一个item
-                        smoothScrollByPosition(1);
-                    } else { //如果滑出高度少于一半则粘性滑回自身
-                        smoothScrollByPosition(0);
+                    if (newState == RecyclerView.SCROLL_STATE_IDLE && mScrolled) {
+                        //粘性滑动的效果
+                        int i = top + measuredHeight;
+                        if (i < 0) { //item的一半高度都超出超出了上限,那就滑到下一个item
+                            smoothScrollByPosition(1);
+                        } else { //如果滑出高度少于一半则粘性滑回自身
+                            smoothScrollByPosition(0);
+                        }
+                        mScrolled = false;
                     }
                     break;
+            }
+            if (newState == RecyclerView.SCROLL_STATE_IDLE && mScrolled) {
+                View childAt = recyclerView.getChildAt(0);
+                if (childAt == null) {
+                    return;
+                }
+                int top = childAt.getTop();
+                top = top - 0 * adapter.getRawHeight();
+                int measuredHeight = childAt.getMeasuredHeight() / 2;
+                //粘性滑动的效果
+                int i = top + measuredHeight;
+                if (i < 0) { //item的一半高度都超出超出了上限,那就滑到下一个item
+                    smoothScrollByPosition(1);
+                } else { //如果滑出高度少于一半则粘性滑回自身
+                    smoothScrollByPosition(0);
+                }
+                mScrolled = false;
             }
         }
 
@@ -145,10 +175,14 @@ public abstract class WheelView {
             //获取目标控件(显示3行，则第二行是目标行，显示5行则第三行是目标行)
             float abs = Math.abs(v);
             WheelView.this.notify(recyclerView, (int) v, abs);
+            if (dx != 0 || dy != 0) {
+                mScrolled = true;
+            }
         }
     };
-    protected void chooseItem(int position){
-        if(onItemChooseListener!=null){
+
+    protected void chooseItem(int position) {
+        if (onItemChooseListener != null) {
             onItemChooseListener.onItemChooseListener(position);
         }
     }
@@ -202,7 +236,7 @@ public abstract class WheelView {
      */
     public int getEmptyViewHeight() {
         int height = rv.getLayoutParams().height;
-        return (int) (height*1.0 / rawCount);
+        return (int) (height * 1.0 / rawCount);
     }
 
     public LinearLayoutManager getLayoutManager() {
@@ -221,15 +255,16 @@ public abstract class WheelView {
         return rawCount;
     }
 
-    public interface OnItemChooseListener{
+    public interface OnItemChooseListener {
         void onItemChooseListener(int position);
     }
 
     /**
      * 滑动到目标item
+     *
      * @param position
      */
-    public void scrollToPosition(int position){
-        Log.d(TAG,"你必须自己实现这个方法");
+    public void scrollToPosition(int position) {
+        Log.d(TAG, "你必须自己实现这个方法");
     }
 }

@@ -84,7 +84,7 @@ public abstract class GroupRecyclerViewAdapter<T> extends MyBaseRecyclerAdapter<
 
 
     @Override
-    protected void onInitViewHolder(InnerBaseViewHolder holder, ViewGroup parent, int viewType) {
+    protected void onInitViewHolder(MyBaseRecyclerAdapter.InnerBaseViewHolder holder, ViewGroup parent, int viewType) {
         super.onInitViewHolder(holder, parent, viewType);
     }
 

@@ -19,6 +19,10 @@
         <activity android:name=".layout_manager.LayoutActivity" />
         <activity android:name=".decoration.DecorationActivity" />
         <activity android:name=".wheel.WheelActivity" />
+        <activity android:name=".ChannelManagerActivity" />
+        <activity android:name=".viewpager.ViewPagerActivity"></activity>
+        <activity android:name=".review1.ReviewActivity"/>
+        <activity android:name=".review2.Review2Activity"/>
     </application>
 
 </manifest>
